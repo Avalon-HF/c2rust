@@ -36,6 +36,7 @@ dependencies = [
 name = "c2rust"
 version = "0.1.0"
 dependencies = [
+ "cpp-ast",
  "proc-macro2",
  "quote",
  "serde",

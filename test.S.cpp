@@ -23592,7 +23592,6 @@ namespace std __attribute__ ((__visibility__ ("default")))
   extern wostream wclog;
   __extension__ __asm (".globl _ZSt21ios_base_library_initv");
 }
-
 int add(int a, int b) {
     return a + b;
 }

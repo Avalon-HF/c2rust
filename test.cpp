@@ -1,5 +1,9 @@
 #include <iostream>
 
+const int GLOBAL_A = 5;
+
+int GLBOAL_B = 10;
+
 // int add func
 int add(int a, int b) {
     // comment before return

@@ -2,4 +2,4 @@
 
 set -u
 
-clang++ -Xclang -ast-dump=json -fsyntax-only -nostdinc++ -nostdinc -fparse-all-comments $1
+clang++ -Xclang -ast-dump=json -fsyntax-only -fparse-all-comments $1

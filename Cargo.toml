@@ -13,5 +13,5 @@ syn = { version = "2.0.52", features = ["full", "extra-traits"] }
 
 [workspace]
 members = [
-    "cpp-ast",
+    "cpp-ast", "rust-ast",
 ]

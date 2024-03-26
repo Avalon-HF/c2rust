@@ -1,5 +1,11 @@
-
+use clang_ast::Node;
+use proc_macro2::{Ident, TokenStream};
+use quote::quote;
 use serde::Deserialize;
+use syn::Expr;
+use crate::ast::NodeContext;
+use crate::transpiler::Transpile;
+use crate::utils::ctype_to_rtype;
 
 #[derive(Debug, Deserialize)]
 pub enum Clang {
@@ -8,9 +14,9 @@ pub enum Clang {
     /// nullptr 字面量
     CXXNullPtrLiteralExpr,
     /// 复合语句，由 `{}` 块包围的一系列语句和声明
-    CompoundStmt,
+    CompoundStmt(CompoundStmt),
     /// 声明语句
-    DeclStmt,
+    DeclStmt(DeclStmt),
     /// 函数声明
     FunctionDecl(FunctionDecl),
     /// 函数参数声明
@@ -25,6 +31,9 @@ pub enum Clang {
     CXXRecordDecl(CXXRecordDecl),
     /// 隐式类型转换
     ImplicitCastExpr(ImplicitCastExpr),
+    /// 变量声明
+    VarDecl(ValDecl),
+    CStyleCastExpr(CStyleCastExpr),
     /// 注释块
     FullComment,
     /// 段落注释
@@ -38,6 +47,12 @@ pub enum Clang {
     /// 其他 Kind 将被忽略
     Other,
 }
+
+#[derive(Debug, Deserialize)]
+pub struct CompoundStmt;
+
+#[derive(Debug, Deserialize)]
+pub struct DeclStmt;
 
 /// 类型定义字段
 /// typedef <type.qual_type> <name>;
@@ -64,14 +79,14 @@ pub struct FunctionDecl {
     /// 函数类型，如 int (int, int)
     pub r#type: Type,
     /// 函数在源码中的位置信息
-    pub loc: Loc,
+    pub loc: Option<Loc>,
 }
 
 /// 函数参数声明字段
 #[derive(Debug, Deserialize)]
 pub struct ParmValDecl {
     /// 参数名
-    pub name: String,
+    pub name: Option<String>,
     /// 参数类型
     pub r#type: Type,
 }
@@ -99,7 +114,7 @@ pub struct DeclRefExpr {
 #[serde(rename_all = "camelCase")]
 pub struct CXXRecordDecl {
     /// 结构体/类名
-    pub name: String,
+    pub name: Option<String>,
     /// class, struct 等
     pub tag_used: String,
     /// 是否是抽象类
@@ -116,6 +131,23 @@ pub struct ImplicitCastExpr {
     pub r#type: Type,
     /// 转换的种类
     pub cast_kind: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CStyleCastExpr {
+    pub cast_kind: String,
+    pub r#type: Type,
+}
+
+/// 变量声明字段
+#[derive(Debug, Deserialize)]
+pub struct ValDecl {
+    /// 变量名
+    pub name: String,
+    pub r#type: Type,
+    /// 是否马上初始化 (有初始值)
+    pub init: Option<String>,
 }
 
 /// 注释字段
@@ -152,6 +184,16 @@ pub struct Type {
     pub desugared_qual_type: Option<String>,
 }
 
+impl Type {
+    pub fn type_name(&self) -> &str {
+        self.desugared_qual_type.as_ref().unwrap_or(&self.qual_type)
+    }
+
+    pub fn return_type(&self) -> Option<&str> {
+        self.qual_type.splitn(2, " (").next()
+    }
+}
+
 /// 在源码中的位置信息
 #[derive(Debug, Deserialize)]
 pub struct Loc {
@@ -162,4 +204,111 @@ pub struct Loc {
 #[derive(Debug, Deserialize)]
 pub struct ReferencedDecl {
     pub id: String,
+}
+
+//////////////////////////////////
+
+impl Transpile for CompoundStmt {
+    fn transpile(&self, ctx: &NodeContext, inner: &[Node<Clang>]) -> Option<TokenStream> {
+        let mut tokens = Vec::new();
+        for inner in inner {
+            let code = match &inner.kind {
+                Clang::DeclStmt(decl_stmt) => decl_stmt.transpile(ctx, &inner.inner),
+                _ => None
+            };
+            if let Some(token) = code {
+                tokens.push(token);
+            }
+        }
+        Some(quote! { #(#tokens)* })
+    }
+}
+
+impl Transpile for DeclStmt {
+    fn transpile(&self, ctx: &NodeContext, inner: &[Node<Clang>]) -> Option<TokenStream> {
+        let mut tokens = Vec::new();
+        for inner in inner {
+            let code = match &inner.kind {
+                Clang::VarDecl(val_decl) => val_decl.transpile(ctx, &inner.inner),
+                _ => None
+            };
+            if let Some(token) = code {
+                tokens.push(token);
+            }
+        }
+        Some(quote! { #(#tokens)* })
+    }
+}
+
+impl Transpile for ValDecl {
+    fn transpile(&self, ctx: &NodeContext, inner: &[Node<Clang>]) -> Option<TokenStream> {
+        let name = &self.name;
+        let ty = self.r#type.type_name();
+        let (ty, is_pointer) = ctype_to_rtype(ty);
+
+        let name = syn::parse_str::<Ident>(name).unwrap();
+        let ty = syn::parse_str::<syn::Type>(&ty).unwrap();
+
+        let ty = if is_pointer {
+            quote! { Box<#ty> }
+        } else {
+            quote! { #ty }
+        };
+
+        if self.init.is_some() {
+            let mut init_tokens = Vec::new();
+            for inner in inner {
+                match &inner.kind {
+                    // TODO: 没时间了，这里应该一层层往下找，目前看到 CStyleCastExpr 默认是 malloc 操作
+                    Clang::CStyleCastExpr(_) => {
+                        init_tokens.push(quote! { Box::new(Default::default()); })
+                    }
+                    Clang::IntegerLiteral(int_literal) => {
+                        let value = &int_literal.value;
+                        let value = syn::parse_str::<Expr>(value).unwrap();
+                        init_tokens.push(quote! { #value; })
+                    }
+                    _ => {}
+                }
+            }
+            Some(quote! { let #name: #ty = #(#init_tokens)*; })
+        } else {
+            Some(quote! { let #name: #ty; })
+        }
+    }
+}
+
+impl Transpile for FunctionDecl {
+    fn transpile(&self, ctx: &NodeContext, inner: &[Node<Clang>]) -> Option<TokenStream> {
+        let return_type = self.r#type.return_type().unwrap();
+        let mut return_type = ctype_to_rtype(return_type).0;
+        let name = self.name.as_str();
+
+        if name == "main" {
+            return_type = "()".to_string();
+        }
+
+        let mut stmt = Vec::new();
+        for inner in inner {
+            match &inner.kind {
+                Clang::CompoundStmt(compound_stmt) => {
+                    stmt.push(compound_stmt.transpile(ctx, &inner.inner).unwrap());
+                }
+                Clang::BinaryOperator(bin_operator) => {
+                    let opcode = &bin_operator.opcode;
+                }
+                _ => {}
+            }
+        }
+
+        let name = syn::parse_str::<Ident>(name).unwrap();
+        let ty = syn::parse_str::<syn::Type>(&return_type).unwrap();
+
+        let fn_decl = quote! {
+            fn #name() -> #ty {
+                #(#stmt)*
+            }
+        };
+        Some(fn_decl)
+    }
 }

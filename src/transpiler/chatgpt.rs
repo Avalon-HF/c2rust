@@ -1,6 +1,7 @@
 use std::path::Path;
 use color_eyre::eyre::eyre;
-use crate::llm::chatgpt::{ChatGPTClient, Message, MessageRole};
+use crate::llm::chatgpt::{ChatGPTClient, MessageRole};
+use crate::llm::Message;
 use crate::transpiler::{TranspileInfo, Transpiler};
 
 const SYSTEM_PROMPT: &'static str = r#"Transpile C/C++ source code to Rust code. You must follow the rules below:

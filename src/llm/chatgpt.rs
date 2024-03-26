@@ -1,6 +1,7 @@
 use color_eyre::eyre::eyre;
 use reqwest::Client;
 use reqwest::header::{AUTHORIZATION, HeaderMap, HeaderValue};
+use crate::llm::Message;
 use serde::{Deserialize, Serialize};
 
 const API_URL: &'static str = "https://api.openai.com/v1/chat/completions";
@@ -50,12 +51,6 @@ impl ChatGPTClient {
 pub struct CompletionRequest<'a> {
     model: &'a str,
     messages: &'a [Message],
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Message {
-    role: MessageRole,
-    content: String,
 }
 
 impl Message {

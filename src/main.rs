@@ -1,7 +1,7 @@
 use std::io::Write;
 use std::process::{Command, Stdio};
 use color_eyre::eyre::eyre;
-use crate::transpiler::{ChatGPT, Transpiler};
+use crate::transpiler::{ChatGPT, CodeInterpreter, Transpiler};
 
 mod transpiler;
 mod llm;
@@ -18,7 +18,8 @@ async fn main() {
 }
 
 async fn run() -> color_eyre::Result<()> {
-    let gpt = ChatGPT::init()?;
+    // let llm = ChatGPT::init()?;
+    let llm = CodeInterpreter::init();
     let args = std::env::args().collect::<Vec<_>>();
     if args.len() < 2 {
         return Err(eyre!("usage: {} <source>", args[0]));
@@ -26,7 +27,7 @@ async fn run() -> color_eyre::Result<()> {
     let source_path = &args[1];
 
     let source_code = std::fs::read_to_string(source_path)?;
-    let resp = gpt.transpile(&source_code).await?;
+    let resp = llm.transpile(&source_code).await?;
     println!("transpiled Rust code: ====\n {} \n====\n", resp);
     Ok(())
 }

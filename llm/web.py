@@ -10,7 +10,7 @@ router = APIRouter()
 llm = CodeInterpreter()
 
 
-@router.post("/completion")
+@router.post("/completions")
 async def completion(req: List[CompletionReq]) -> CompletionResp:
     messages = list(map(lambda x: x.to_message(), req))
     try:

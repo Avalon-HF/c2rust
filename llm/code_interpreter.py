@@ -8,7 +8,7 @@ import sys
 
 MODEL_PATH = "m-a-p/OpenCodeInterpreter-DS-6.7B"
 
-RESPONSE_REG = re.compile(r'### Response:\s+(.*?)\s*<\|EOT\|>', re.MULTILINE)
+RESPONSE_REG = re.compile(r'(?s)### Response:\s+(.*?)\s*<\|EOT\|>', re.MULTILINE)
 
 
 
@@ -36,5 +36,3 @@ def extract_last_response(text: str) -> str:
     if len(texts) > 0:
         return texts[-1]
     raise ValueError(f'no matched response block found, the original full text is: {text}')
-
-

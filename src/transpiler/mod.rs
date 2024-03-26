@@ -2,8 +2,10 @@ use std::collections::HashMap;
 use std::path::Path;
 
 mod chatgpt;
+mod code_interpreter;
 
 pub use chatgpt::ChatGPT;
+pub use code_interpreter::CodeInterpreter;
 
 pub trait Transpiler {
     /// transpile from source code directly

@@ -1,7 +1,7 @@
 use std::io::Write;
 use std::process::{Command, Stdio};
 use color_eyre::eyre::eyre;
-use crate::transpiler::{ChatGPT, CodeInterpreter, Transpiler};
+use crate::transpiler::{CodeInterpreter, Transpiler};
 
 mod transpiler;
 mod llm;
@@ -18,7 +18,6 @@ async fn main() {
 }
 
 async fn run() -> color_eyre::Result<()> {
-    // let llm = ChatGPT::init()?;
     let llm = CodeInterpreter::init();
     let args = std::env::args().collect::<Vec<_>>();
     if args.len() < 2 {
@@ -32,8 +31,7 @@ async fn run() -> color_eyre::Result<()> {
     Ok(())
 }
 
-
-fn compile_rust_code(code: &str) -> String {
+pub fn compile_rust_code(code: &str) -> String {
     // 调用 rustc 编译代码
     let mut rustc = Command::new("rustc")
         .args(&[ "-"]) // 可能需要根据 rustc 版本进行调整
@@ -43,7 +41,7 @@ fn compile_rust_code(code: &str) -> String {
         .expect("无法执行编译");
 
     // 获取 stdin 的可变引用
-    if let Some(mut stdin) = rustc.stdin.as_mut() {
+    if let Some(stdin) = rustc.stdin.as_mut() {
         // 向编译器传递代码
         stdin.write_all(code.as_bytes()).expect("无法写入 stdin");
     } else {

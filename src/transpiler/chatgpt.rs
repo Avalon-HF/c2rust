@@ -42,7 +42,7 @@ impl Transpiler for ChatGPT {
         self.send_message(source.as_ref()).await
     }
 
-    async fn transpile_from_path<P: AsRef<Path>>(&self, path: P) -> color_eyre::Result<Vec<TranspileInfo>> {
+    async fn transpile_from_path<P: AsRef<Path>>(&self, _path: P) -> color_eyre::Result<Vec<TranspileInfo>> {
         todo!()
     }
 }

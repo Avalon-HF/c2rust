@@ -1,6 +1,7 @@
 use std::cell::RefCell;
 use std::path::Path;
 use color_eyre::eyre::eyre;
+use crate::compile_rust_code;
 use crate::llm::chatgpt::MessageRole;
 use crate::llm::code_interpreter::CodeInterpreterClient;
 use crate::llm::Message;
@@ -26,13 +27,28 @@ impl CodeInterpreter {
         }
     }
 
-    async fn send_message<S: Into<String>>(&self, source_code: S) -> color_eyre::Result<String> {
-        let msg = Message::new(MessageRole::User, source_code.into());
-        todo!()
+    /// 向大模型发送 C/C++ 代码，获取转译的 Rust 代码，可以选择提供编译错误信息
+    async fn get_suggestion<S, T>(&self, source_code: S, error_msg: Option<T>) -> color_eyre::Result<String>
+    where
+        S: Into<String>,
+        T: Into<String>,
+    {
+        let prompt = if let Some(error_msg) = error_msg {
+            format!("Here is Rust code: ```rust\n{}\n```. Here is compiler error from rustc: ```\n{}\n```. Try to fix the error", source_code.into(), error_msg.into())
+        } else {
+            format!("```cpp\n{}\n```", source_code.into())
+        };
+        let msg = Message::new(MessageRole::User, prompt);
+        let response = self.conversation(msg).await?;
+        Self::extract_rust_code_block(&response)
     }
 
     async fn conversation(&self, msg: Message) -> color_eyre::Result<String> {
         self.client.borrow_mut().conversation(msg).await
+    }
+
+    fn clear_conversation(&self) {
+        self.client.borrow_mut().clear_history();
     }
 
     fn extract_rust_code_block(resp_text: &str) -> color_eyre::Result<String> {
@@ -44,10 +60,23 @@ impl CodeInterpreter {
 
 impl Transpiler for CodeInterpreter {
     async fn transpile<T: AsRef<str>>(&self, source: T) -> color_eyre::Result<String> {
-        todo!("transpile many times with compiler error handling")
+        let source = source.as_ref();
+        let mut resp = self.get_suggestion(source, Option::<&str>::None).await?;
+
+        let mut max_tries = 3;
+        let mut error_message = compile_rust_code(&resp);
+        while !error_message.is_empty() && max_tries > 0 {
+            max_tries -= 1;
+            // 将上一步 LLM 返回的 Rust 代码作为输入，继续获取建议
+            self.clear_conversation();
+            resp = self.get_suggestion(&resp, Some(error_message)).await?;
+            error_message = compile_rust_code(&resp);
+        }
+
+        Ok(resp)
     }
 
-    async fn transpile_from_path<P: AsRef<Path>>(&self, path: P) -> color_eyre::Result<Vec<TranspileInfo>> {
+    async fn transpile_from_path<P: AsRef<Path>>(&self, _path: P) -> color_eyre::Result<Vec<TranspileInfo>> {
         todo!()
     }
 }

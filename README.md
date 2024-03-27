@@ -249,8 +249,6 @@ cargo run --release -- /path/to/source.cpp
 
 
 
-------
-
 [^1]: [Hallucination (artificial intelligence) - Wikipedia](https://en.wikipedia.org/wiki/Hallucination_(artificial_intelligence))
 
 [^2]: 一个在实现 rust 派生宏时经常用到的库，用其自定义的语法来将特定结构转为 Token，进而生成 rust 代码。

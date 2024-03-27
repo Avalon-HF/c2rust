@@ -248,6 +248,11 @@ cargo run --release -- /path/to/source.cpp
 4. 交互的优化：提供更加用户友好的 GUI 或 web 页面来降低工具的使用难度。
 
 
+## 9. 演示视频
+
+[演示视频](./assets/demo.mp4)
+
+
 
 [^1]: [Hallucination (artificial intelligence) - Wikipedia](https://en.wikipedia.org/wiki/Hallucination_(artificial_intelligence))
 

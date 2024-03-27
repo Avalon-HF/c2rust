@@ -28,6 +28,7 @@ class CodeInterpreter:
         inputs = inputs.to('cuda')
         sample = self.model.generate(**inputs, max_length=4096)
         text = self.tokenizer.decode(sample[0])
+        torch.cuda.empty_cache()
         return extract_last_response(text)
 
 
